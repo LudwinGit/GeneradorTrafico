@@ -6,9 +6,13 @@ import (
 	"os"
 	"encoding/json"
 	"io/ioutil"
+	"net/http"
+	"bytes"
+	"log"
 )
 
 var wg sync.WaitGroup
+var url string
 
 type Caso struct{
 	Name         string `json:"name"`
@@ -43,7 +47,6 @@ func getCasos(path string) CasosContenedor {
 }
 
 func main(){
-	var url string
 	var gorutinas int
 	var solicitudes int
 	var path string
@@ -76,10 +79,16 @@ func main(){
 	wg.Add(gorutinas)
 
 	for gorutinas > 0 {
+		indiceFinal := 0
 		if gorutinas == 1{
-			go enviarCasos(casos.Casos,indice,indice+rango+faltante)	
+			indiceFinal = indice+rango+faltante
 		}else{
-			go enviarCasos(casos.Casos,indice,indice+rango)	
+			indiceFinal = indice+rango
+		}
+		go enviarCasos(casos.Casos,indice,indiceFinal)	
+
+		if indiceFinal == solicitudes{
+			break;
 		}
 		indice += rango
 		gorutinas--
@@ -91,7 +100,24 @@ func main(){
 func enviarCasos(casos []Caso, indiceInicial int, indiceFinal int){
 	defer wg.Done()
 	for indiceInicial < indiceFinal{
-		fmt.Println(casos[indiceInicial].toString(),indiceInicial)		
+		push(casos[indiceInicial])
 		indiceInicial +=1
 	}
+}
+
+func push(caso Caso) {
+	jsonReq, err := json.Marshal(caso)
+	if url==""{
+		url = "http://casos.covid19so1.tk/caso"
+	}
+    resp, err := http.Post(url, "application/json; charset=utf-8", bytes.NewBuffer(jsonReq))
+    if err != nil {
+        log.Fatalln(err)
+    }
+
+    defer resp.Body.Close()
+    bodyBytes, _ := ioutil.ReadAll(resp.Body)
+
+    bodyString := string(bodyBytes)
+    fmt.Println(bodyString)
 }
